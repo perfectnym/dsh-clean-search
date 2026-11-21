@@ -14,6 +14,7 @@
     "weather",
     "stock"
   ],
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/perfectnym/dsh-clean-search.git"
