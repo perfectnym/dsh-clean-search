@@ -1,0 +1,6 @@
+- insert:
+    - id: clean-search
+      name: dsh-clean-search
+      config:
+        city: 上海
+        count: 10
