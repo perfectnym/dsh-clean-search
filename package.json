@@ -4,6 +4,21 @@
   "private": true,
   "type": "module",
   "description": "清爽搜索：基于 DeepSeek Search API 的无广告搜索首页，含天气、行情 K 线/分时、以图搜图与官网优先排序。",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek",
+    "deepseek-harness",
+    "search",
+    "ad-free",
+    "weather",
+    "stock"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/perfectnym/dsh-clean-search.git"
+  },
+  "homepage": "https://github.com/perfectnym/dsh-clean-search",
   "exports": {
     ".": "./index.js",
     "./client": "./client/client.js",
