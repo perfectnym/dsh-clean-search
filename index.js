@@ -1046,6 +1046,9 @@ function rank(results, query, exam, weightOptions = {}) {
 
 /** 按名称查股票（腾讯 smartbox，GBK + \uXXXX 转义）；命中返回 { symbol, name }。 */
 async function suggestStock(query, cache) {
+  // 纯数字查询只认完整的 6 位 A 股代码（由 detectMarket 处理）；114/110/120 这类短号不当股票
+  const digits = /^\d+$/.exec(String(query ?? '').trim())
+  if (digits !== null && digits[0].length !== 6) return undefined
   const key = 'suggest:' + query
   const cached = cacheGet(cache, key, 3600)
   if (cached !== undefined) return cached === null ? undefined : cached
