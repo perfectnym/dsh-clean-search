@@ -308,17 +308,47 @@ const BRAND_PROFILES = {
   中国移动: { hosts: ['10086.cn'], name: '中国移动官网' },
   中国联通: { hosts: ['chinaunicom.com'], name: '中国联通官网' },
   中国电信: { hosts: ['chinatelecom.com.cn'], name: '中国电信官网' },
+  谷歌: { hosts: ['google.com'], name: 'Google 官网' },
+  google: { hosts: ['google.com'], name: 'Google 官网' },
+  alphabet: { hosts: ['abc.xyz'], name: 'Alphabet 官网' },
+  智谱: { hosts: ['zhipuai.cn', 'z.ai', 'codegeex.cn'], name: '智谱官网' },
+  zhipu: { hosts: ['zhipuai.cn', 'z.ai'], name: '智谱官网' },
+  zcode: { hosts: ['zcode.z.ai', 'codegeex.cn'], name: 'ZCode 官网' },
+  英伟达: { hosts: ['nvidia.com'], name: 'NVIDIA 官网' },
+  nvidia: { hosts: ['nvidia.com'], name: 'NVIDIA 官网' },
+  亚马逊: { hosts: ['amazon.com'], name: '亚马逊官网' },
+  amazon: { hosts: ['amazon.com'], name: '亚马逊官网' },
+  奈飞: { hosts: ['netflix.com'], name: 'Netflix 官网' },
+  netflix: { hosts: ['netflix.com'], name: 'Netflix 官网' },
+  meta: { hosts: ['meta.com'], name: 'Meta 官网' },
+  facebook: { hosts: ['facebook.com'], name: 'Facebook 官网' },
+  台积电: { hosts: ['tsmc.com'], name: '台积电官网' },
+  tsmc: { hosts: ['tsmc.com'], name: '台积电官网' },
+  字节跳动: { hosts: ['bytedance.com'], name: '字节跳动官网' },
+  腾讯控股: { hosts: ['tencent.com'], name: '腾讯控股官网' },
+  京东集团: { hosts: ['jd.com'], name: '京东集团官网' },
+  携程: { hosts: ['ctrip.com'], name: '携程官网' },
+  网易有道: { hosts: ['youdao.com'], name: '网易有道官网' },
+  中芯国际: { hosts: ['smic.com'], name: '中芯国际官网' },
+  上汽集团: { hosts: ['saicmotor.com'], name: '上汽集团官网' },
+  宁德新能源: { hosts: ['catl.com'], name: '宁德时代官网' },
 }
 
 /** 所有品牌官网域名（供排序匹配）。 */
 const BRAND_HOSTS = [...new Set(Object.values(BRAND_PROFILES).flatMap(profile => profile.hosts))]
 
-/** 从查询里识别品牌/公司简称（最长匹配）。 */
+/** 从查询里识别品牌/公司简称（最长匹配；短英文词按词边界，避免 meta 命中 metadata）。 */
 function resolveBrand(query) {
   const text = String(query ?? '').toLowerCase()
   const entries = Object.entries(BRAND_PROFILES).sort((a, b) => b[0].length - a[0].length)
   for (const [word, profile] of entries) {
-    if (text.includes(word.toLowerCase())) return { word, ...profile }
+    const key = word.toLowerCase()
+    if (/^[a-z]{1,4}$/.test(key)) {
+      const boundary = new RegExp('(^|[^a-z])' + key + '([^a-z]|$)')
+      if (boundary.test(text)) return { word, ...profile }
+      continue
+    }
+    if (text.includes(key)) return { word, ...profile }
   }
   return undefined
 }
@@ -889,24 +919,92 @@ async function suggestStock(query, cache) {
     let raw = match[1]
     try { raw = JSON.parse('"' + raw.replace(/"/g, '\\"') + '"') } catch { /* 保留原文 */ }
     const rows = raw.split('^').filter(Boolean).map((row) => {
-      const [market, code, name] = row.split('~')
-      return { market, code, name }
-    })
-    const hit = rows.find(row => row.name && row.code && (row.name.includes(query) || query.includes(row.name)))
+      const [market, code, name, pinyin, kind] = row.split('~')
+      return { market: String(market ?? '').toLowerCase(), code: String(code ?? ''), name: String(name ?? ''), kind: String(kind ?? '') }
+    }).filter(row => row.code !== '' && row.name !== '')
+    // 排除 ETF / 期权 / 基金 / 债券 / 权证 / 牛熊证等衍生品，只留正股
+    const isDerivative = row => /etf|期权|基金|债券|牛|熊|购|沽|窝轮|权证|reits/i.test(row.name)
+      || /^(qz|zs|etf|fund|bond)$/i.test(row.kind)
+    const candidates = rows.filter(row => !isDerivative(row) && /GP/i.test(row.kind))
+    const textQuery = String(query).trim()
+    const scoreOf = row => {
+      let score = 0
+      if (row.name === textQuery) score += 100
+      else if (row.name.includes(textQuery)) score += 40
+      else if (textQuery.includes(row.name)) score += 20
+      if (row.kind === 'GP-A') score += 30
+      score -= Math.max(0, row.name.length - textQuery.length) * 2
+      return score
+    }
+    const hit = candidates.sort((a, b) => scoreOf(b) - scoreOf(a))[0]
     let value
     if (hit !== undefined) {
-      const market = String(hit.market ?? '').toLowerCase()
-      const code = String(hit.code ?? '')
-      const symbol = market === 'hk' ? 'hk' + code
-        : market === 'us' ? 'us' + code.toUpperCase()
-          : ((market === 'sh' || market === 'sz') ? market + code : 'sh' + code)
-      value = { symbol, name: hit.name }
+      const market = hit.market
+      const code = hit.code.toUpperCase()
+      let symbol
+      let klineSymbol
+      if (market === 'hk') {
+        symbol = 'hk' + code
+        klineSymbol = symbol
+      } else if (market === 'us') {
+        // 美股：报价用 usGOOGL，日 K 用 usGOOGL.OQ（交易所后缀）
+        const base = code.replace(/\.[a-z0-9]+$/i, '')
+        const suffix = code.includes('.') ? '.' + code.split('.').pop().toUpperCase() : ''
+        symbol = 'us' + base
+        klineSymbol = 'us' + base + suffix
+      } else if (market === 'sh' || market === 'sz' || market === 'bj') {
+        symbol = market + code
+        klineSymbol = symbol
+      } else {
+        symbol = 'sh' + code
+        klineSymbol = symbol
+      }
+      value = { symbol, klineSymbol, name: hit.name, market }
     }
     cacheSet(cache, key, value ?? null)
     return value
   } catch {
     return undefined
   }
+}
+
+/** A 股公司官网（东方财富公司资料），仅 sh/sz/bj；缓存 1 天。 */
+async function eastmoneyWebsite(symbol, cache) {
+  if (!/^(sh|sz|bj)\d{6}$/.test(symbol)) return undefined
+  const key = 'eastmoney-web:' + symbol
+  const cached = cacheGet(cache, key, 86400)
+  if (cached !== undefined) return cached === null ? undefined : cached
+  try {
+    const prefix = symbol.slice(0, 2) === 'sh' ? 'SH' : symbol.slice(0, 2) === 'sz' ? 'SZ' : 'BJ'
+    const response = await fetch(`https://emweb.securities.eastmoney.com/PC_HSF10/CompanySurvey/PageAjax?code=${prefix}${symbol.slice(2)}`, {
+      headers: { 'user-agent': 'Mozilla/5.0', referer: 'https://emweb.securities.eastmoney.com/' },
+      signal: timeout(8000),
+    })
+    if (!response.ok) return undefined
+    const text = await response.text()
+    const match = /"(?:COMPANY_WEB|ORG_WEB)":"([^"]+)"/.exec(text)
+    let value
+    if (match) {
+      const host = match[1].trim().toLowerCase()
+        .replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/+$/, '')
+      if (host.includes('.') && host.length > 4) value = { host }
+    }
+    cacheSet(cache, key, value ?? null)
+    return value
+  } catch {
+    return undefined
+  }
+}
+
+/** 解析查询对应的公司官网：品牌表 → A 股东财反查。 */
+async function resolveCompanyOfficial(query, market, cache) {
+  const brand = resolveBrand(query)
+  if (brand !== undefined) return { host: brand.hosts[0], name: brand.name, source: 'brand' }
+  if (market !== undefined && /^(sh|sz|bj)\d{6}$/.test(market.symbol)) {
+    const web = await eastmoneyWebsite(market.symbol, cache)
+    if (web !== undefined) return { host: web.host, name: (market.label || '公司') + '官网', source: 'eastmoney' }
+  }
+  return undefined
 }
 
 /** 统一标的代码：裸 6 位股票补前缀、hk/us 大小写归一；无法识别返回 undefined。 */
@@ -923,7 +1021,10 @@ function normalizeSymbol(raw) {
   }
   if (/^hk\d{5}$/.test(lower)) return lower
   if (/^hk[a-z]+$/.test(lower)) return 'hk' + lower.slice(2).toUpperCase()
-  if (/^us[a-z]+$/.test(lower)) return 'us' + lower.slice(2).toUpperCase()
+  if (/^us[a-z]+(\.[a-z0-9]+)?$/.test(lower)) {
+    const [base, suffix] = text.slice(2).split('.')
+    return 'us' + base.toUpperCase() + (suffix !== undefined ? '.' + suffix.toUpperCase() : '')
+  }
   if (/^fx_[a-z]+$/.test(lower)) return lower
   if (/^nf_[a-z0-9]+$/.test(lower)) return lower
   if (/^[a-z]{1,2}\d{0,2}$/.test(lower)) return lower
@@ -1421,25 +1522,28 @@ export function apply(ctx, rawConfig = {}) {
         ? Array.from(query + ' ' + exam.hints).slice(0, 128).join('')
         : (brand !== undefined ? Array.from(query + ' 官网').slice(0, 128).join('') : query)
       let market = detectMarket(query)
+      let suggestion
       if (market === undefined) {
-        // 公司简称（如「菜百」）→ 股票代码，让搜索结果里带行情走势
-        const suggestion = await suggestStock(query, cache)
+        // 公司简称 / 中文公司名（如「菜百」「谷歌」「智谱」）→ 股票代码（A 股 / 港股 / 美股）
+        suggestion = await suggestStock(query, cache)
         if (suggestion !== undefined) market = { symbol: suggestion.symbol, kind: 'stock', label: suggestion.name }
       }
+      const chartSymbol = suggestion?.klineSymbol ?? market?.symbol
       try {
-        const [search, chart] = await Promise.all([
+        const [search, chart, official] = await Promise.all([
           searchSources(ctx, searchQuery, count, config, { fresh }),
           market === undefined ? Promise.resolve(null) : (async () => {
             try {
               const quote = await quoteFor(market.symbol)
               const [day, minute] = await Promise.all([
-                chartFor(market.symbol, 'day').catch(() => null),
-                chartFor(market.symbol, 'minute').catch(() => null),
+                chartFor(chartSymbol, 'day').catch(() => null),
+                chartFor(chartSymbol, 'minute').catch(() => null),
               ])
               const hasData = (day?.candles?.length ?? 0) > 0 || (minute?.candles?.length ?? 0) > 0
               return { market: hasData ? market : null, quote: hasData ? quote : null, day, minute }
             } catch { return { market: null, quote: null, day: null, minute: null } }
           })(),
+          resolveCompanyOfficial(query, market, cache),
         ])
         let ranked = rank(search.results, query, exam, weightOptions)
         const synthetic = (title, host, snippet) => ({
@@ -1465,8 +1569,17 @@ export function apply(ctx, rawConfig = {}) {
             ranked = [...missing.map(official => synthetic(official.name + ' · 官方入口', official.host, '官方报名 / 信息入口')), ...ranked]
           }
         }
-        // 品牌/公司简称：结果里没召回官网时，把官网补到第一条
-        if (brand !== undefined) {
+        // 有股票行情的公司：官网永远第一条（品牌表 / A 股东财公司资料反查）
+        if (official !== undefined) {
+          const officialIndex = ranked.findIndex(row => hostMatches(row.host, official.host))
+          if (officialIndex < 0) {
+            ranked = [synthetic(official.name, official.host, official.source === 'eastmoney' ? '公司官方网站（公开公司资料）' : '官方网站'), ...ranked]
+          } else if (officialIndex > 0) {
+            const [row] = ranked.splice(officialIndex, 1)
+            ranked = [{ ...row, official: true, tier: 2 }, ...ranked]
+          }
+        } else if (brand !== undefined) {
+          // 品牌但未匹配到官网记录（兜底）
           const hasOfficial = ranked.some(row => brand.hosts.some(domain => hostMatches(row.host, domain)))
           if (!hasOfficial) ranked = [synthetic(brand.name, brand.hosts[0], '官方网站'), ...ranked]
         }
@@ -1479,7 +1592,8 @@ export function apply(ctx, rawConfig = {}) {
           query,
           exam: exam === undefined ? null : { label: exam.label, official: exam.official },
           brand: brand === undefined ? null : { name: brand.name, host: brand.hosts[0], word: brand.word },
-          chartAfter: brand !== undefined && (chart?.quote != null || chart?.market != null),
+          official: official === undefined ? null : { name: official.name, host: official.host, source: official.source },
+          chartAfter: chart !== null && (chart.quote != null || chart.market != null),
           market: chart?.market ?? null,
           quote: chart?.quote ?? null,
           day: chart?.day ?? null,
