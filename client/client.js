@@ -46,6 +46,7 @@ window.__ModuleLoader__.load({
       reset: '重置', apply: '应用',
       usageToday: '今日搜索 {n} 次 · 约 ¥{cost}',
       imageTimeout: '图搜超时（图片较大或网络较慢），请换小一点的图或稍后重试',
+      call: '拨打', officialSite: '官网',
     }
     const ENDICT = {
       nav: 'Clean Search', title: 'Clean Search', subtitle: 'No ads · Official sites first · Live markets',
@@ -80,6 +81,7 @@ window.__ModuleLoader__.load({
       reset: 'Reset', apply: 'Apply',
       usageToday: 'Searches today: {n} · about ¥{cost}',
       imageTimeout: 'Image search timed out (large image or slow network). Try a smaller image or retry later.',
+      call: 'Call', officialSite: 'Website',
     }
 
     let t = key => ZHDICT[key] ?? key
@@ -340,6 +342,13 @@ window.__ModuleLoader__.load({
 .csearch-slider-label{width:64px;flex:none;}
 .csearch-slider{flex:1;accent-color:var(--dsw-alias-brand-primary,#3d7bfd);}
 .csearch-slider-value{width:32px;text-align:right;font-variant-numeric:tabular-nums;color:var(--dsw-alias-label-primary,#1f2328);}
+
+/* ---- 特殊号码卡片 ---- */
+.csearch-special{display:flex;align-items:center;gap:16px;max-width:760px;margin:12px auto 4px;padding:16px 20px;border:1px solid var(--dsw-alias-border-l1,#eef0f3);border-radius:16px;background:linear-gradient(135deg,rgba(61,123,253,.08),rgba(143,123,255,.06));}
+.csearch-special-number{font-size:28px;font-weight:800;letter-spacing:.5px;color:var(--dsw-alias-brand-primary,#3d7bfd);font-variant-numeric:tabular-nums;white-space:nowrap;}
+.csearch-special-info{flex:1 1 auto;min-width:0;}
+.csearch-special-name{font-size:15px;font-weight:700;color:var(--dsw-alias-label-primary,#1f2328);}
+.csearch-special-desc{font-size:12.5px;line-height:1.6;color:var(--dsw-alias-label-secondary,#5c6570);margin-top:4px;}
 
 /* ---- weather modal ---- */
 .csearch-modal-mask{position:fixed;inset:0;z-index:80;background:rgba(15,20,30,.38);display:flex;align-items:center;justify-content:center;padding:24px;}
@@ -810,6 +819,20 @@ window.__ModuleLoader__.load({
         h('circle', { cx: 9, cy: 17, r: 2.2, fill: 'currentColor' }))
     }
 
+    function SpecialCard({ data }) {
+      const special = data?.special
+      if (!special) return null
+      const isTel = !special.website
+      return h('div', { className: 'csearch-special' },
+        h('div', { className: 'csearch-special-number' }, special.number),
+        h('div', { className: 'csearch-special-info' },
+          h('div', { className: 'csearch-special-name' }, special.name),
+          h('div', { className: 'csearch-special-desc' }, special.desc)),
+        isTel
+          ? h('a', { className: 'csearch-btn mini', href: 'tel:' + special.number }, t('call'))
+          : h('a', { className: 'csearch-btn mini', href: special.website, target: '_blank', rel: 'noreferrer' }, t('officialSite')))
+    }
+
     function ResultsView({ data, query, onBack, onSearch, onImage, onRefresh, onRead, onOpenSort, focusTick }) {
       const [value, setValue] = useState(query ?? '')
       const results = data?.results ?? []
@@ -871,6 +894,7 @@ window.__ModuleLoader__.load({
             h('button', { className: 'sr-tool-link', onClick: onOpenSort }, t('sortPrefs')))),
         (data?.notices ?? []).map((notice, index) =>
           h('div', { key: 'n' + index, className: 'csearch-notice' }, notice.message)),
+        h(SpecialCard, { data }),
         hasChart && !chartAfter ? h(ChartCard, { data }) : null,
         data?.exam?.official?.length
           ? h('div', { className: 'csearch-official-bar' },

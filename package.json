@@ -1,6 +1,6 @@
 {
   "name": "dsh-clean-search",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "description": "清爽搜索：基于 DeepSeek Search API 的无广告搜索首页，含天气、行情 K 线/分时、以图搜图与官网优先排序。",

@@ -430,6 +430,71 @@ function resolveBrand(query) {
   return matchList(runtimeBrandOverrides) ?? matchList(BRAND_PROFILES)
 }
 
+/** 常用特殊号码：紧急 / 政务 / 银行 / 运营商 / 快递。 */
+const SPECIAL_NUMBERS = [
+  { number: '110', name: '报警电话', desc: '公安机关报警电话，24 小时免费，遇到违法犯罪、治安事件时拨打。', website: '', words: ['报警', '公安'] },
+  { number: '119', name: '火警电话', desc: '消防救援电话，火灾、危险化学品事故等紧急情况拨打。', website: '', words: ['火警', '火灾', '消防'] },
+  { number: '120', name: '急救电话', desc: '医疗急救电话，突发疾病、意外伤害需要救护车时拨打。', website: '', words: ['急救', '救护车'] },
+  { number: '122', name: '交通事故报警', desc: '道路交通事故报警电话，发生交通事故时拨打。', website: '', words: ['交通事故', '交警'] },
+  { number: '12110', name: '短信报警', desc: '短信报警号码，不方便语音报警时发送短信至 12110。', website: '', words: [] },
+  { number: '12123', name: '交管 12123', desc: '公安部交通管理局互联网交通安全综合服务管理平台，可查询违章、办理车驾管业务。', website: 'https://122.gov.cn', words: ['交管', '违章', '车管'] },
+  { number: '12306', name: '中国铁路客服', desc: '中国铁路 12306 客服与购票服务，可查询车次、购票、退改签。', website: 'https://www.12306.cn', words: ['铁路', '火车票', '火车'] },
+  { number: '12345', name: '政务服务便民热线', desc: '各地政务服务便民热线，受理政务咨询、投诉建议、非紧急求助。', website: 'https://www.gov.cn', words: ['政务', '便民', '市长热线'] },
+  { number: '12315', name: '消费者投诉举报', desc: '全国 12315 消费者投诉举报平台，处理消费纠纷、假冒伪劣举报。', website: 'https://www.12315.cn', words: ['消费者', '投诉', '消费维权'] },
+  { number: '12333', name: '人社服务热线', desc: '人力资源和社会保障服务热线，社保、就业、劳动关系咨询投诉。', website: 'https://www.mohrss.gov.cn', words: ['人社', '社保', '劳动'] },
+  { number: '12348', name: '法律援助热线', desc: '公共法律服务热线，法律咨询与法律援助申请。', website: 'https://www.12348.gov.cn', words: ['法律', '法律援助'] },
+  { number: '12369', name: '环保举报热线', desc: '生态环境保护举报投诉热线。', website: 'https://www.mee.gov.cn', words: ['环保', '环境'] },
+  { number: '12358', name: '价格举报热线', desc: '价格违法行为举报投诉热线。', website: '', words: ['物价', '价格'] },
+  { number: '12329', name: '住房公积金热线', desc: '住房公积金服务热线，查询缴存、贷款、提取政策。', website: '', words: ['公积金'] },
+  { number: '12328', name: '交通运输服务监督', desc: '交通运输服务监督电话，出租车、公交、客运等投诉咨询。', website: '', words: ['交通运输', '出租车'] },
+  { number: '114', name: '查号台', desc: '固定电话查号台，可查询企事业单位电话号码。', website: '', words: ['查号'] },
+  { number: '95588', name: '中国工商银行客服', desc: '中国工商银行 24 小时客服热线，账户、信用卡、贷款业务咨询。', website: 'https://www.icbc.com.cn', words: ['工商银行', '工行'] },
+  { number: '95533', name: '中国建设银行客服', desc: '中国建设银行 24 小时客服热线。', website: 'https://www.ccb.com', words: ['建设银行', '建行'] },
+  { number: '95555', name: '招商银行客服', desc: '招商银行 24 小时客服热线。', website: 'https://www.cmbchina.com', words: ['招商银行', '招行'] },
+  { number: '95566', name: '中国银行客服', desc: '中国银行 24 小时客服热线。', website: 'https://www.boc.cn', words: ['中国银行', '中行'] },
+  { number: '95599', name: '中国农业银行客服', desc: '中国农业银行 24 小时客服热线。', website: 'https://www.abchina.com', words: ['农业银行', '农行'] },
+  { number: '95511', name: '中国平安客服', desc: '中国平安保险集团客服热线。', website: 'https://www.pingan.com', words: ['中国平安', '平安'] },
+  { number: '95518', name: '人保财险客服', desc: '中国人民财产保险客服热线。', website: 'https://www.picc.com.cn', words: ['人保', '中国人保'] },
+  { number: '95500', name: '中国人寿客服', desc: '中国人寿保险客服热线。', website: 'https://www.chinalife.com.cn', words: ['中国人寿', '人寿'] },
+  { number: '95528', name: '浦发银行客服', desc: '浦发银行 24 小时客服热线。', website: 'https://www.spdb.com.cn', words: ['浦发银行', '浦发'] },
+  { number: '95508', name: '广发银行客服', desc: '广发银行 24 小时客服热线。', website: 'https://www.cgbchina.com.cn', words: ['广发银行', '广发'] },
+  { number: '95595', name: '中国光大银行客服', desc: '中国光大银行 24 小时客服热线。', website: 'https://www.cebbank.com', words: ['光大银行', '光大'] },
+  { number: '10086', name: '中国移动客服', desc: '中国移动 10086 客服热线，话费、套餐、宽带业务咨询。', website: 'https://www.10086.cn', words: ['中国移动', '移动'] },
+  { number: '10010', name: '中国联通客服', desc: '中国联通 10010 客服热线，话费、套餐、宽带业务咨询。', website: 'https://www.chinaunicom.com', words: ['中国联通', '联通'] },
+  { number: '10000', name: '中国电信客服', desc: '中国电信 10000 客服热线，话费、宽带、天翼业务咨询。', website: 'https://www.chinatelecom.com.cn', words: ['中国电信', '电信'] },
+  { number: '95338', name: '顺丰速运客服', desc: '顺丰速运客服热线，查件、寄件、理赔。', website: 'https://www.sf-express.com', words: ['顺丰'] },
+  { number: '11183', name: '中国邮政客服', desc: '中国邮政客户服务热线，邮件查询、寄递咨询。', website: 'https://www.chinapost.com.cn', words: ['中国邮政', '邮政'] },
+  { number: '95311', name: '中通快递客服', desc: '中通快递客服热线，查件、寄件。', website: 'https://www.zto.com', words: ['中通'] },
+  { number: '95543', name: '申通快递客服', desc: '申通快递客服热线，查件、寄件。', website: 'https://www.sto.cn', words: ['申通'] },
+  { number: '95546', name: '韵达快递客服', desc: '韵达快递客服热线，查件、寄件。', website: 'https://www.yundaex.com', words: ['韵达'] },
+  { number: '95554', name: '圆通速递客服', desc: '圆通速递客服热线，查件、寄件。', website: 'https://www.yto.net.cn', words: ['圆通'] },
+]
+
+/** 识别查询里的特殊号码（纯号码 / 号码+客服 / 品牌+客服电话）。 */
+function detectSpecialNumber(query) {
+  const text = String(query ?? '').trim()
+  if (text.length === 0) return undefined
+  const compact = text.replace(/\s+/g, '')
+  const find = number => SPECIAL_NUMBERS.find(entry => entry.number === number)
+  const pure = /^\d{3,6}$/.exec(compact)
+  if (pure !== null) {
+    const hit = find(pure[0])
+    if (hit !== undefined) return hit
+  }
+  if (/客服|电话|热线|号码|是什么|多少|怎么打|服务/.test(compact)) {
+    const numeric = /(\d{3,6})/.exec(compact)
+    if (numeric !== null) {
+      const hit = find(numeric[1])
+      if (hit !== undefined) return hit
+    }
+    const candidates = SPECIAL_NUMBERS.filter(entry => entry.words.some(word => compact.includes(word)))
+    if (candidates.length > 0) {
+      return candidates.sort((a, b) => b.words.length - a.words.length)[0]
+    }
+  }
+  return undefined
+}
+
 /** 权威站置顶需要查询意图匹配（避免政采公告霸占「空调」这类选购词）。 */
 const INTENT_OFFICIAL = /政策|公告|通知|官网|报名|法规|条例|规定|数据|统计|考试|指南|目录|标准|办法|文件|政府|部门|银行|利率|股票|指数|汇率|基金|期货|签证|护照|社保|公积金|税务|发票|驾照|违章|天气|预警|地震|台风|招标|采购|预算|规划|补贴|落户|居住证/
 
@@ -1599,6 +1664,7 @@ export function apply(ctx, rawConfig = {}) {
       const exam = findExamRule(query)
       const brand = resolveBrand(query)
       const officialAlias = resolveOfficialAlias(query)
+      const special = detectSpecialNumber(query)
       const searchQuery = exam !== undefined
         ? Array.from(query + ' ' + exam.hints).slice(0, 128).join('')
         : ((brand !== undefined || officialAlias !== undefined) ? Array.from(query + ' 官网').slice(0, 128).join('') : query)
@@ -1651,18 +1717,31 @@ export function apply(ctx, rawConfig = {}) {
           }
         }
         // 有股票行情的公司：官网永远第一条（品牌表 / A 股东财公司资料反查）
-        if (official !== undefined) {
-          const officialIndex = ranked.findIndex(row => hostMatches(row.host, official.host))
-          if (officialIndex < 0) {
-            ranked = [synthetic(official.name, official.host, official.source === 'eastmoney' ? '公司官方网站（公开公司资料）' : '官方网站'), ...ranked]
-          } else if (officialIndex > 0) {
-            const [row] = ranked.splice(officialIndex, 1)
-            ranked = [{ ...row, official: true, tier: 2 }, ...ranked]
+        if (special === undefined) {
+          if (official !== undefined) {
+            const officialIndex = ranked.findIndex(row => hostMatches(row.host, official.host))
+            if (officialIndex < 0) {
+              ranked = [synthetic(official.name, official.host, official.source === 'eastmoney' ? '公司官方网站（公开公司资料）' : '官方网站'), ...ranked]
+            } else if (officialIndex > 0) {
+              const [row] = ranked.splice(officialIndex, 1)
+              ranked = [{ ...row, official: true, tier: 2 }, ...ranked]
+            }
+          } else if (brand !== undefined) {
+            // 品牌但未匹配到官网记录（兜底）
+            const hasOfficial = ranked.some(row => brand.hosts.some(domain => hostMatches(row.host, domain)))
+            if (!hasOfficial) ranked = [synthetic(brand.name, brand.hosts[0], '官方网站'), ...ranked]
           }
-        } else if (brand !== undefined) {
-          // 品牌但未匹配到官网记录（兜底）
-          const hasOfficial = ranked.some(row => brand.hosts.some(domain => hostMatches(row.host, domain)))
-          if (!hasOfficial) ranked = [synthetic(brand.name, brand.hosts[0], '官方网站'), ...ranked]
+        }
+        // 特殊号码（110 / 12306 / 95588…）：号码信息永远第一条
+        if (special !== undefined) {
+          const numberHost = special.website !== ''
+            ? (() => { try { return new URL(special.website).hostname.replace(/^www\./, '') } catch { return special.number } })()
+            : special.number
+          ranked = [{
+            ...synthetic(special.number + ' · ' + special.name, numberHost, special.desc),
+            url: special.website !== '' ? special.website : 'tel:' + special.number,
+            special: true,
+          }, ...ranked]
         }
         await appendUsage({
           ts: new Date().toISOString(), query, count, ok: true,
@@ -1674,6 +1753,7 @@ export function apply(ctx, rawConfig = {}) {
           exam: exam === undefined ? null : { label: exam.label, official: exam.official },
           brand: brand === undefined ? null : { name: brand.name, host: brand.hosts[0], word: brand.word },
           official: official === undefined ? null : { name: official.name, host: official.host, source: official.source },
+          special: special === undefined ? null : { number: special.number, name: special.name, desc: special.desc, website: special.website },
           chartAfter: chart !== null && (chart.quote != null || chart.market != null),
           market: chart?.market ?? null,
           quote: chart?.quote ?? null,
