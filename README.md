@@ -54,6 +54,7 @@ dsh plugin --profile desktop add link:<path-to-this-repo>
 | `city` | 上海 | 首页默认城市 |
 | `count` | 10 | 默认搜索结果条数 |
 | `cacheSeconds` | 21600 | 搜索结果缓存时长（秒） |
+| `officialOverrides` | `{}` | 自定义「名称 → 官网」映射，如 `{ "知网": "cnki.net" }`，可补充品牌表未收录的站点 |
 
 ## 凭据
 

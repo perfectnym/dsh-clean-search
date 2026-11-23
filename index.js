@@ -22,7 +22,7 @@ export const name = 'clean-search'
 export const inject = ['webServer']
 
 const API = '/dsh-clean-search/api'
-const DEFAULTS = Object.freeze({ city: '上海', count: 10, cacheSeconds: 21600 })
+const DEFAULTS = Object.freeze({ city: '上海', count: 10, cacheSeconds: 21600, officialOverrides: {} })
 
 const WEATHER_TEXT = {
   0: '晴', 1: '多云', 2: '多云', 3: '阴', 45: '雾', 48: '雾凇',
@@ -332,6 +332,34 @@ const BRAND_PROFILES = {
   中芯国际: { hosts: ['smic.com'], name: '中芯国际官网' },
   上汽集团: { hosts: ['saicmotor.com'], name: '上汽集团官网' },
   宁德新能源: { hosts: ['catl.com'], name: '宁德时代官网' },
+  知网: { hosts: ['cnki.net'], name: '中国知网官网' },
+  中国知网: { hosts: ['cnki.net'], name: '中国知网官网' },
+  cnki: { hosts: ['cnki.net'], name: '中国知网官网' },
+  万方: { hosts: ['wanfangdata.com.cn'], name: '万方数据官网' },
+  万方数据: { hosts: ['wanfangdata.com.cn'], name: '万方数据官网' },
+  维普: { hosts: ['cqvip.com'], name: '维普官网' },
+  超星: { hosts: ['chaoxing.com'], name: '超星官网' },
+  百度学术: { hosts: ['xueshu.baidu.com'], name: '百度学术官网' },
+  谷歌学术: { hosts: ['scholar.google.com'], name: 'Google 学术' },
+  pubmed: { hosts: ['pubmed.ncbi.nlm.nih.gov'], name: 'PubMed' },
+  arxiv: { hosts: ['arxiv.org'], name: 'arXiv' },
+  中国裁判文书网: { hosts: ['wenshu.court.gov.cn'], name: '中国裁判文书网' },
+  国家统计局: { hosts: ['stats.gov.cn'], name: '国家统计局官网' },
+  中国政府网: { hosts: ['gov.cn'], name: '中国政府网' },
+  国家税务总局: { hosts: ['chinatax.gov.cn'], name: '国家税务总局官网' },
+  12306: { hosts: ['12306.cn'], name: '中国铁路 12306 官网' },
+  天眼查: { hosts: ['tianyancha.com'], name: '天眼查官网' },
+  企查查: { hosts: ['qichacha.com'], name: '企查查官网' },
+  知乎: { hosts: ['zhihu.com'], name: '知乎官网' },
+  小红书: { hosts: ['xiaohongshu.com'], name: '小红书官网' },
+  微博: { hosts: ['weibo.com'], name: '微博官网' },
+  爱奇艺: { hosts: ['iqiyi.com'], name: '爱奇艺官网' },
+  优酷: { hosts: ['youku.com'], name: '优酷官网' },
+  腾讯视频: { hosts: ['v.qq.com'], name: '腾讯视频官网' },
+  网易云音乐: { hosts: ['music.163.com'], name: '网易云音乐官网' },
+  当当: { hosts: ['dangdang.com'], name: '当当官网' },
+  苏宁: { hosts: ['suning.com'], name: '苏宁易购官网' },
+  中国邮政: { hosts: ['chinapost.com.cn'], name: '中国邮政官网' },
 }
 
 /** 地区/别称直接映射到官网（如「日亚」→ 日本亚马逊 amazon.co.jp）。 */
@@ -363,20 +391,43 @@ function resolveOfficialAlias(query) {
 /** 所有品牌官网域名（供排序匹配）。 */
 const BRAND_HOSTS = [...new Set(Object.values(BRAND_PROFILES).flatMap(profile => profile.hosts))]
 
-/** 从查询里识别品牌/公司简称（最长匹配；短英文词按词边界，避免 meta 命中 metadata）。 */
+/** 用户通过 config.officialOverrides 追加/覆盖的官网映射（运行时生效）。 */
+let runtimeBrandOverrides = {}
+
+/** 把 config 里的 officialOverrides 规范化（支持 "名称": "域名" 或 {hosts:[...], name}）。 */
+function applyOfficialOverrides(input) {
+  runtimeBrandOverrides = {}
+  if (input === null || typeof input !== 'object' || Array.isArray(input)) return
+  for (const [word, value] of Object.entries(input)) {
+    const key = String(word ?? '').trim()
+    if (key.length === 0) continue
+    if (typeof value === 'string') {
+      const host = value.trim().replace(/^https?:\/\//, '').replace(/\/+$/, '')
+      if (host.length > 3) runtimeBrandOverrides[key] = { hosts: [host], name: key + '官网' }
+    } else if (value !== null && typeof value === 'object' && Array.isArray(value.hosts) && value.hosts.length > 0) {
+      const hosts = value.hosts.map(host => String(host).trim().replace(/^https?:\/\//, '').replace(/\/+$/, '')).filter(host => host.length > 3)
+      if (hosts.length > 0) runtimeBrandOverrides[key] = { hosts, name: String(value.name ?? key + '官网') }
+    }
+  }
+}
+
+/** 从查询里识别品牌/公司简称（用户覆盖优先，最长匹配；短英文词按词边界）。 */
 function resolveBrand(query) {
   const text = String(query ?? '').toLowerCase()
-  const entries = Object.entries(BRAND_PROFILES).sort((a, b) => b[0].length - a[0].length)
-  for (const [word, profile] of entries) {
-    const key = word.toLowerCase()
-    if (/^[a-z]{1,4}$/.test(key)) {
-      const boundary = new RegExp('(^|[^a-z])' + key + '([^a-z]|$)')
-      if (boundary.test(text)) return { word, ...profile }
-      continue
+  const matchList = (table) => {
+    const entries = Object.entries(table).sort((a, b) => b[0].length - a[0].length)
+    for (const [word, profile] of entries) {
+      const key = word.toLowerCase()
+      if (/^[a-z]{1,4}$/.test(key)) {
+        const boundary = new RegExp('(^|[^a-z])' + key + '([^a-z]|$)')
+        if (boundary.test(text)) return { word, ...profile }
+        continue
+      }
+      if (text.includes(key)) return { word, ...profile }
     }
-    if (text.includes(key)) return { word, ...profile }
+    return undefined
   }
-  return undefined
+  return matchList(runtimeBrandOverrides) ?? matchList(BRAND_PROFILES)
 }
 
 /** 权威站置顶需要查询意图匹配（避免政采公告霸占「空调」这类选购词）。 */
@@ -1498,6 +1549,7 @@ function safeHandler(fn, admit) {
 
 export function apply(ctx, rawConfig = {}) {
   const config = { ...DEFAULTS, ...(rawConfig ?? {}) }
+  applyOfficialOverrides(config.officialOverrides)
   const cache = new Map()
 
   ctx.inject(['webServer'], (host) => {
