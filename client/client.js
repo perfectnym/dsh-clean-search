@@ -15,7 +15,7 @@ window.__ModuleLoader__.load({
     const NS = 'clean-search'
     const ZHDICT = {
       nav: '清爽搜索', title: '清爽搜索', subtitle: '无广告 · 官网优先 · 行情直连',
-      placeholder: '搜索，或输入 上证指数 / 美元人民币 / 螺纹钢 看行情',
+      placeholder: '搜索，或输入关键词',
       search: '搜索', imageSearch: '以图搜图', back: '返回',
       headlines: '今日要闻', weather: '天气', markets: '行情',
       weatherDetail: '天气详情', close: '关闭', humidity: '湿度', wind: '风速',
@@ -50,7 +50,7 @@ window.__ModuleLoader__.load({
     }
     const ENDICT = {
       nav: 'Clean Search', title: 'Clean Search', subtitle: 'No ads · Official sites first · Live markets',
-      placeholder: 'Search anything — or a ticker like SSE Index, USD/CNY, rebar futures',
+      placeholder: 'Search anything',
       search: 'Search', imageSearch: 'Search by image', back: 'Back',
       headlines: 'Headlines', weather: 'Weather', markets: 'Markets',
       weatherDetail: 'Weather details', close: 'Close', humidity: 'Humidity', wind: 'Wind',
@@ -148,7 +148,6 @@ window.__ModuleLoader__.load({
       return '⛈️'
     }
 
-    const QUICK = ['上证指数', '美元人民币', '螺纹钢', '恒生指数', '黄金']
     const QUICK_CITIES = ['北京', '上海', '广州', '深圳', '杭州', '成都']
     const CITY_KEY = 'dsh-clean-search:city'
     const HISTORY_KEY = 'dsh-clean-search:history'
@@ -798,11 +797,7 @@ window.__ModuleLoader__.load({
         h('div', { className: 'csearch-hero' },
           h('div', { className: 'csearch-logo' }, t('title')),
           h('div', { className: 'csearch-tagline' }, t('subtitle')),
-          h(SearchBar, { value: query, onChange: setQuery, onSubmit: submit, onImage, focusTick }),
-          h('div', { className: 'csearch-chips' },
-            h('span', { className: 'csearch-chips-label' }, t('quick')),
-            QUICK.map(word => h('button', { key: word, className: 'csearch-chip', onClick: () => onSearch(word) }, word)))),
-        h('div', { className: 'csearch-home-hint' }, t('homeHint')),
+          h(SearchBar, { value: query, onChange: setQuery, onSubmit: submit, onImage, focusTick })),
         h('div', { className: 'csearch-home-meta' },
           usageText ? h('span', { className: 'csearch-muted' }, usageText) : null,
           h('button', { className: 'csearch-link-btn', onClick: onOpenSort }, t('sortPrefs'))),
