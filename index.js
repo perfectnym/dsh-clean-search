@@ -334,6 +334,32 @@ const BRAND_PROFILES = {
   宁德新能源: { hosts: ['catl.com'], name: '宁德时代官网' },
 }
 
+/** 地区/别称直接映射到官网（如「日亚」→ 日本亚马逊 amazon.co.jp）。 */
+const OFFICIAL_ALIASES = [
+  { words: ['日亚', '日本亚马逊', '日本亚玛逊', '日亚亚马逊'], host: 'amazon.co.jp', name: '日本亚马逊官网' },
+  { words: ['美亚', '美国亚马逊'], host: 'amazon.com', name: '亚马逊美国官网' },
+  { words: ['德亚', '德国亚马逊'], host: 'amazon.de', name: '亚马逊德国官网' },
+  { words: ['英亚', '英国亚马逊'], host: 'amazon.co.uk', name: '亚马逊英国官网' },
+  { words: ['法亚', '法国亚马逊'], host: 'amazon.fr', name: '亚马逊法国官网' },
+  { words: ['加亚', '加拿大亚马逊'], host: 'amazon.ca', name: '亚马逊加拿大官网' },
+  { words: ['澳亚', '澳洲亚马逊', '澳大利亚亚马逊'], host: 'amazon.com.au', name: '亚马逊澳洲官网' },
+  { words: ['印亚', '印度亚马逊'], host: 'amazon.in', name: '亚马逊印度官网' },
+]
+
+/** 识别地区别称（精确 / 前缀 / 后缀匹配，避免「今日亚洲」这类误伤）。 */
+function resolveOfficialAlias(query) {
+  const text = String(query ?? '').trim()
+  if (text.length === 0) return undefined
+  for (const entry of OFFICIAL_ALIASES) {
+    for (const word of entry.words) {
+      if (text === word || text.startsWith(word) || text.endsWith(word)) {
+        return { host: entry.host, name: entry.name, word }
+      }
+    }
+  }
+  return undefined
+}
+
 /** 所有品牌官网域名（供排序匹配）。 */
 const BRAND_HOSTS = [...new Set(Object.values(BRAND_PROFILES).flatMap(profile => profile.hosts))]
 
@@ -996,8 +1022,10 @@ async function eastmoneyWebsite(symbol, cache) {
   }
 }
 
-/** 解析查询对应的公司官网：品牌表 → A 股东财反查。 */
+/** 解析查询对应的公司官网：地区别称 → 品牌表 → A 股东财反查。 */
 async function resolveCompanyOfficial(query, market, cache) {
+  const alias = resolveOfficialAlias(query)
+  if (alias !== undefined) return { host: alias.host, name: alias.name, source: 'alias' }
   const brand = resolveBrand(query)
   if (brand !== undefined) return { host: brand.hosts[0], name: brand.name, source: 'brand' }
   if (market !== undefined && /^(sh|sz|bj)\d{6}$/.test(market.symbol)) {
@@ -1518,9 +1546,10 @@ export function apply(ctx, rawConfig = {}) {
       const weightOptions = { rel: slider('rel'), fresh: slider('freshW'), off: slider('off') }
       const exam = findExamRule(query)
       const brand = resolveBrand(query)
+      const officialAlias = resolveOfficialAlias(query)
       const searchQuery = exam !== undefined
         ? Array.from(query + ' ' + exam.hints).slice(0, 128).join('')
-        : (brand !== undefined ? Array.from(query + ' 官网').slice(0, 128).join('') : query)
+        : ((brand !== undefined || officialAlias !== undefined) ? Array.from(query + ' 官网').slice(0, 128).join('') : query)
       let market = detectMarket(query)
       let suggestion
       if (market === undefined) {
