@@ -1,35 +1,38 @@
 # 清爽搜索 · dsh-clean-search
 
-给 [DeepSeek Harness](https://github.com/deepseek-ai) 用的**无广告搜索首页**插件：一个搜索框，搜索结果官网优先、竞价广告降权，附带天气、行情走势与以图搜图。
+给 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 用的**无广告搜索首页**插件：搜索结果官网优先、竞价广告降权，并把天气、行情走势、特殊号码与以图搜图收进同一个搜索页。
 
 ![首页](docs/screenshots/home.png)
 
 ## 功能
 
-- **无广告搜索**：走 DeepSeek Search API，结果按「考试官方 > 品牌/权威官网 > 其他」排序；内置广告域名库与营销文案特征，竞价/培训/医疗广告降权并打标
-- **官网优先**：内置常见品牌公司简称映射（菜百 → 菜百首饰官网、iPhone → apple.com…），搜索结果没召回官网时自动补一条官方入口
-- **公司官网置顶 + 行情配合**：搜索有股票行情的公司（A 股 / 港股 / 美股，如「谷歌」「智谱」「贵州茅台」）时，公司官网固定第一条，行情 K 线/分时紧随其后，新闻等其他内容排在后面；A 股公司官网通过东方财富公开公司资料自动反查
-- **行情直连**：搜索股票/外汇/期货/指数或公司简称时，直接出实时报价 + 日 K + 分时（腾讯 / 新浪公开接口）
+- **无广告搜索**：DeepSeek Search API，结果按「考试官方 > 品牌/权威官网 > 其他」排序；内置广告域名库与营销文案特征，竞价/培训/医疗广告降权并打标
+- **公司官网置顶 + 行情配合**：搜索有股票行情的公司（A 股 / 港股 / 美股）时，公司官网固定第一条，行情 K 线/分时紧随其后，新闻等其他内容排在后面；A 股任意公司通过东方财富公开公司资料自动反查官网（如「伊利股份」→ yili.com）
+- **品牌与地区别名**：内置 116 条品牌/服务官网映射（菜百、谷歌、智谱、知网、知乎、12306…），支持地区站点别名（日亚 / 日本亚马逊 → `amazon.co.jp`）
+- **行情直连**：股票 / 外汇 / 期货 / 指数实时报价 + 日 K + 分时；中文公司名自动识别（「腾讯控股」→ 港股 00700）；纯数字查询只认完整 6 位 A 股代码（000002 → 万科 A）
+- **特殊号码**：36 个常用号码（110 / 119 / 120 / 114 / 12306 / 12345 / 12315 / 95588 / 10086 / 顺丰…），支持「纯号码」「号码 + 客服」「品牌 + 客服电话」三种识别；号码卡片带官网或拨打按钮
 - **天气**：Open-Meteo 免 key，含空气质量、穿衣指数、15 日预报、城市切换（本地记忆）
-- **以图搜图**：DeepSeek 联网图搜 + 多引擎兜底链接；大图上传前自动压缩
-- **搜索体验**：搜索历史与联想（↑↓ / Tab）、6 小时结果缓存、URL 规范去重、失败可读提示、今日搜索用量统计
-- **阅读模式**：结果页站内提取正文，不用跳浏览器
-- **排序偏好**：相关性 / 时效 / 官网优先三个滑杆，按需调整
+- **以图搜图**：DeepSeek 联网图搜 + 多引擎兜底链接；大图上传前自动压缩；识别结果按 Markdown 排版、相似图为网格、来源网页为列表
+- **搜索体验**：搜索历史与联想（↑↓ / Tab）、6 小时结果缓存、URL 规范去重、失败可读提示、今日搜索用量统计、阅读模式、排序权重滑杆
 - **深色模式**自适应
 
 ## 截图
 
-| 首页 | 搜索结果 |
+| 首页 | 搜索结果：公司官网 + 行情 |
 |---|---|
-| ![home](docs/screenshots/home.png) | ![search](docs/screenshots/search.png) |
+| ![home](docs/screenshots/home.png) | ![results-company](docs/screenshots/results-company.png) |
 
-| 结果页（官网 + 行情） | 以图搜图 |
+| 特殊号码 | 以图搜图 |
 |---|---|
-| ![results](docs/screenshots/results.png) | ![image](docs/screenshots/image-results.png) |
+| ![results-special](docs/screenshots/results-special.png) | ![image-results](docs/screenshots/image-results.png) |
 
-| 天气详情 | 阅读模式 |
+| 官网优先（品牌） | 天气详情 |
 |---|---|
-| ![weather](docs/screenshots/weather.png) | ![reader](docs/screenshots/reader.png) |
+| ![brand](docs/screenshots/brand.png) | ![weather](docs/screenshots/weather.png) |
+
+| 阅读模式 | |
+|---|---|
+| ![reader](docs/screenshots/reader.png) | |
 
 ## 安装
 
@@ -54,7 +57,7 @@ dsh plugin --profile desktop add link:<path-to-this-repo>
 | `city` | 上海 | 首页默认城市 |
 | `count` | 10 | 默认搜索结果条数 |
 | `cacheSeconds` | 21600 | 搜索结果缓存时长（秒） |
-| `officialOverrides` | `{}` | 自定义「名称 → 官网」映射，如 `{ "知网": "cnki.net" }`，可补充品牌表未收录的站点 |
+| `officialOverrides` | `{}` | 自定义「名称 → 官网」映射，如 `{ "某平台": "example.com" }`，可补充品牌表未收录的站点 |
 
 ## 凭据
 
@@ -71,7 +74,9 @@ dsh plugin --profile desktop add link:<path-to-this-repo>
 
 - 依赖 DeepSeek Search API（按次计费），失败时降级到 DSH 的 `ctx.web` 搜索
 - 行情与天气来自公开接口，可能受网络环境影响
-- 以图搜图受模型速度影响，大图已自动压缩，仍可能偶发超时
+- 美股只有日 K（腾讯接口不提供美股分时）；A 股与港股有分时
+- 纯数字查询只识别完整 6 位 A 股代码；港股 5 位代码请用中文名 / 英文名搜索（如「腾讯控股」）
+- 品牌官网表覆盖常见站点，未收录的站点可用 `officialOverrides` 自行补充
 
 ## License
 
